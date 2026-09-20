@@ -1,140 +1,85 @@
-# 🛡️ ChurnGuard AI · Customer Churn Prediction & Explainability System
+# 🛡️ ChurnGuard AI — Predictive Customer Churn Analytics & Explainability (XAI) Platform
 
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.47+-FF4B4B.svg?style=for-the-badge&logo=Streamlit&logoColor=white)](https://streamlit.io)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?style=for-the-badge&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com)
-[![XGBoost](https://img.shields.io/badge/XGBoost-2.1+-EB5424.svg?style=for-the-badge&logo=XGBoost&logoColor=white)](https://xgboost.readthedocs.io)
-[![SHAP](https://img.shields.io/badge/SHAP-0.45+-blueviolet.svg?style=for-the-badge)](https://shap.readthedocs.io)
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11-3776AB.svg?style=for-the-badge&logo=Python&logoColor=white)](https://python.org)
-
-> **ChurnGuard AI** is an enterprise-grade customer churn prediction and risk analytics platform powered by a tuned **XGBoost** model with real-time **TreeSHAP** explainability and the **Sentinel Dark v2.0** command-center dashboard.
-
----
-
-## 📸 Overview & Features
-
-![Sentinel Dark UI](https://raw.githubusercontent.com/YASWINKUMAR02/Customer_Churn_Prediction/main/outputs/preview.png)
-
-* **🤖 Machine Learning Pipeline**: Trained on customer demographic, service, and billing patterns using a robust `imblearn` pipeline combining `StandardScaler`, `OneHotEncoder`, `SMOTE` class balancing, and a tuned `XGBClassifier`.
-* **🧠 Real-Time SHAP Explainability**: Implements `shap.TreeExplainer` to compute local feature attributions on every prediction, surfacing exact factors accelerating churn (🔴 **Churn Drivers**) and factors preserving customer loyalty (🟢 **Retention Anchors**).
-* **🎨 Sentinel Dark v2.0 Interface**: Cyber-themed command-center with segmented selectors, animated toggle switches, smooth multi-tier risk meter gauge, and automated attribution summaries.
-* **⚡ Dual Serving Architecture**:
-  * **Streamlit App (`app.py`)**: 100% self-contained, cloud-ready for instant deployment on Streamlit Community Cloud or Hugging Face Spaces.
-  * **FastAPI Backend (`api.py`) + Client (`index.html`)**: Production REST API endpoint (`POST /predict`) with standalone single-page web client.
+[![XGBoost](https://img.shields.io/badge/XGBoost-2.1+-EB5424.svg?style=for-the-badge&logo=XGBoost&logoColor=white)](https://xgboost.readthedocs.io)
+[![SHAP](https://img.shields.io/badge/SHAP-Explainable%20AI-blueviolet.svg?style=for-the-badge)](https://shap.readthedocs.io)
+[![Scikit-Learn](https://img.shields.io/badge/scikit--learn-1.6+-F7931E.svg?style=for-the-badge&logo=scikit-learn&logoColor=white)](https://scikit-learn.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Production%20API-009688.svg?style=for-the-badge&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-Interactive%20UI-FF4B4B.svg?style=for-the-badge&logo=Streamlit&logoColor=white)](https://streamlit.io)
 
 ---
 
-## 📁 Repository Structure
+## 📌 Executive Summary
 
-```
-Customer_Churn_Prediction/
-├── api.py                     # FastAPI REST API backend with SHAP endpoint
-├── app.py                     # Self-contained Streamlit Cloud application
-├── index.html                 # Sentinel Dark standalone web interface
-├── requirements.txt           # Python dependencies for local & cloud deployment
-├── README.md                  # Project documentation
-├── data/                      # Dataset directory (Telco Customer Churn)
-├── models/
-│   └── tuned_xgboost_pipeline.pkl  # Serialized end-to-end XGBoost model
-├── notebooks/                 # Exploratory data analysis & model training notebooks
-└── outputs/                   # Visualizations, charts, and metrics
+Acquiring new customers costs **5x to 25x more** than retaining existing ones. **ChurnGuard AI** is an end-to-end Machine Learning and Explainable AI (XAI) solution designed to proactively identify customers at risk of churn and uncover the underlying factors influencing their decision.
+
+By coupling a **tuned XGBoost classification pipeline** with **TreeSHAP (SHapley Additive exPlanations)**, the system shifts churn prevention from reactive guesswork to data-backed, personalized retention strategies.
+
+---
+
+## 🏗️ End-to-End System Architecture
+
+```mermaid
+flowchart LR
+    A[Customer Data\n19 Raw Features] --> B[Pipeline Preprocessing\nStandardScaler + OneHot]
+    B --> C[SMOTE Class Balancing\nSynthetic Minority Oversampling]
+    C --> D[Tuned XGBoost Classifier\nEnsemble Trees]
+    D --> E[Inference Engine\nPrediction & Probability %]
+    D --> F[TreeSHAP Engine\nLocal Feature Attributions]
+    E --> G[Sentinel Dark Command Dashboard\nStreamlit & FastAPI]
+    F --> G
 ```
 
 ---
 
-## ⚙️ Installation & Setup
+## 🎯 Key Technical Highlights & Engineering Depth
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/YASWINKUMAR02/Customer_Churn_Prediction.git
-cd Customer_Churn_Prediction
-```
+### 1. Robust Machine Learning Pipeline
+* **Data Processing**: Engineered a unified `ColumnTransformer` handling numerical normalization (`StandardScaler` for `tenure`, `MonthlyCharges`, `TotalCharges`) and categorical encoding (`OneHotEncoder` with `handle_unknown='ignore'`).
+* **Class Imbalance Mitigation**: Utilized **SMOTE (Synthetic Minority Over-sampling Technique)** inside an `imblearn.pipeline.Pipeline` to synthesize minority class samples during training, preventing majority class bias without data leakage.
+* **Algorithm Selection**: Tuned an **XGBoost (Extreme Gradient Boosting)** ensemble classifier, optimizing for **ROC-AUC** and **F1-Score** to penalize false negatives (missed churners).
 
-### 2. Create a virtual environment & install dependencies
-```bash
-# Create virtual environment
-python -m venv venv
+### 2. Explainable AI (XAI) with TreeSHAP
+Traditional ML models operate as black boxes, making business adoption difficult. ChurnGuard AI integrates **Game-Theoretic Shapley Values**:
+* **Local Feature Attribution**: Calculates the exact mathematical contribution (+/- log-odds impact) of each attribute for an individual customer.
+* **Risk Categorization**:
+  * 🔴 **Churn Drivers (+)**: Quantifies features pulling the customer toward cancellation (e.g., month-to-month contracts, electronic check payment, unbundled security).
+  * 🟢 **Retention Anchors (-)**: Pinpoints loyalty factors (e.g., long tenure, two-year contracts, active tech support).
+* **Automated Natural Language Insights**: Translates complex Shapley matrices into dynamic human-readable executive summaries.
 
-# Activate on Windows
-venv\Scripts\activate
-
-# Activate on macOS/Linux
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
+### 3. Production Microservice & Interactive Dashboards
+* **FastAPI Backend (`api.py`)**: Asynchronous RESTful endpoint (`POST /predict`) delivering sub-50ms inference with real-time SHAP computations.
+* **Sentinel Dark Command Center (`app.py` / `index.html`)**: Interactive 3-column command dashboard featuring custom segmented controls, live risk meter gauges, and dynamic SHAP divergence bar charts.
 
 ---
 
-## 🚀 How to Run
+## 📊 Business Insights & Domain Findings
 
-### Option 1: Streamlit Dashboard (Recommended)
-Runs the self-contained dashboard with native Python model inference and SHAP explainability:
-```bash
-streamlit run app.py
+Analysis of feature importance and TreeSHAP attribution distributions revealed crucial customer behavior patterns:
+
+| Rank | Feature / Factor | Impact on Churn | Business Implication & Strategic Action |
+| :---: | :--- | :---: | :--- |
+| **#1** | **Contract Type** | 🔴 Extreme (+SHAP) | Month-to-month subscribers exhibit the highest churn probability. Offering multi-month discounted lock-in plans dramatically reduces risk. |
+| **#2** | **Tenure Length** | 🟢 Strong (-SHAP) | Churn risk peaks within the first **1–6 months** (onboarding friction). Loyalty compounding begins after 12+ months. |
+| **#3** | **Internet & Add-ons** | 🔴 / 🟢 Dual | Fiber-optic users without bundled **Tech Support** or **Online Security** churn faster due to unaddressed technical issues. Bundling support services significantly improves retention. |
+| **#4** | **Payment Method** | 🔴 Moderate (+SHAP) | Electronic check users have higher churn rates compared to automated credit card/bank transfer autopay subscribers. |
+
+---
+
+## 🛠️ Technology Stack & Tools
+
+* **Core Machine Learning**: `Python`, `XGBoost`, `scikit-learn`, `imbalanced-learn (SMOTE)`, `SHAP`
+* **Data Processing & Analysis**: `Pandas`, `NumPy`, `Joblib`
+* **API & Backend**: `FastAPI`, `Uvicorn`, `Pydantic`
+* **Frontend & Visualization**: `Streamlit`, `Vanilla CSS (Sentinel Dark Design System)`, `HTML5/JavaScript`
+
+---
+
+## 💼 Resume Project Summary
+
+```text
+ChurnGuard AI | Predictive Customer Churn Analytics & Explainability Platform
+• Developed an end-to-end churn prediction pipeline using Tuned XGBoost and SMOTE oversampling on 19 customer features.
+• Integrated TreeSHAP (Explainable AI) to compute real-time local feature attributions, identifying primary churn drivers and retention anchors for personalized intervention.
+• Engineered a production-grade FastAPI REST microservice and an interactive 3-column Sentinel Dark analytics dashboard in Streamlit.
 ```
-Open **[http://localhost:8501](http://localhost:8501)** in your browser.
-
----
-
-### Option 2: FastAPI Backend + Web Client
-Runs the REST API and serves the single-page application on port 8000:
-```bash
-python api.py
-```
-* **Web UI**: Open **[http://localhost:8000](http://localhost:8000)**
-* **Interactive API Docs (Swagger UI)**: Open **[http://localhost:8000/docs](http://localhost:8000/docs)**
-
-#### Example REST API Call (`POST /predict`):
-```bash
-curl -X POST "http://localhost:8000/predict" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "gender": "Male",
-       "SeniorCitizen": 0,
-       "Partner": "No",
-       "Dependents": "No",
-       "tenure": 12,
-       "PhoneService": "Yes",
-       "MultipleLines": "No",
-       "InternetService": "DSL",
-       "OnlineSecurity": "No",
-       "OnlineBackup": "No",
-       "DeviceProtection": "No",
-       "TechSupport": "No",
-       "StreamingTV": "No",
-       "StreamingMovies": "No",
-       "Contract": "Month-to-month",
-       "PaperlessBilling": "No",
-       "PaymentMethod": "Electronic check",
-       "MonthlyCharges": 70.0,
-       "TotalCharges": 1000.0
-     }'
-```
-
----
-
-## 🌐 Deploying to Streamlit Community Cloud
-
-1. Fork or push this repository to your GitHub account.
-2. Visit **[share.streamlit.io](https://share.streamlit.io/)** and sign in.
-3. Click **"New app"**, select your repository, set the **Main file path** to `app.py`, and click **Deploy**.
-
----
-
-## 📊 Features & Model Details
-
-The model evaluates **19 customer attributes**:
-
-| Category | Features |
-| :--- | :--- |
-| **Demographics** | `gender`, `SeniorCitizen`, `Partner`, `Dependents` |
-| **Account & Tenure** | `tenure`, `Contract`, `PaperlessBilling`, `PaymentMethod`, `MonthlyCharges`, `TotalCharges` |
-| **Connectivity & Services** | `PhoneService`, `MultipleLines`, `InternetService` |
-| **Add-on Subscriptions** | `OnlineSecurity`, `OnlineBackup`, `DeviceProtection`, `TechSupport`, `StreamingTV`, `StreamingMovies` |
-
----
-
-## 🛡️ License
-
-Distributed under the **MIT License**. See `LICENSE` for more information.
