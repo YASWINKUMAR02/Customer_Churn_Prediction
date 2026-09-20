@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ChurnGuard AI · Sentinel Dark</title>
+<meta name="description" content="Customer churn prediction powered by XGBoost — Sentinel Dark command-center dashboard." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<style>
+/* ═══════════════════════════════════════════════════════════
+   TOKENS
+════════════════════════════════════════════════════════════ */
+:root {
+  --bg-base:       #0B0F14;
+  --bg-panel:      #141A22;
+  --bg-sidebar:    #0D1219;
+  --bg-input:      #111820;
+  --border:        #232B36;
+  --border-subtle: #1A2330;
+  --accent:        #00D9A3;
+  --accent-dim:    rgba(0,217,163,0.12);
+  --accent-glow:   rgba(0,217,163,0.25);
+  --risk-low:      #22C55E;
+  --risk-low-dim:  rgba(34,197,94,0.12);
+  --risk-med:      #F59E0B;
+  --risk-med-dim:  rgba(245,158,11,0.12);
+  --risk-high:     #EF4444;
+  --risk-high-dim: rgba(239,68,68,0.12);
+  --text:          #E8ECF1;
+  --text-muted:    #8A94A3;
+  --text-dim:      #4A5568;
+  --radius-sm:     6px;
+  --radius:        10px;
+  --radius-lg:     14px;
+  --shadow:        0 4px 24px rgba(0,0,0,0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RESET
+════════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; scroll-behavior: smooth; }
+body {
+  background: var(--bg-base);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.6;
+}
+input, select, button, textarea { font-family: inherit; }
+a { color: inherit; text-decoration: none; }
+
+/* ═══════════════════════════════════════════════════════════
+   SCROLLBAR
+════════════════════════════════════════════════════════════ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* ═══════════════════════════════════════════════════════════
+   HEADER
+════════════════════════════════════════════════════════════ */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  overflow: hidden;
+}
+
+/* Shield watermark pattern */
+.header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='48' viewBox='0 0 24 28'%3E%3Cpath d='M12 2L3 6v7c0 5.25 3.75 10.15 9 11.35C17.25 23.15 21 18.25 21 13V6L12 2z' fill='none' stroke='%23ffffff' stroke-width='1'/%3E%3C/svg%3E");
+  background-size: 40px 48px;
+  opacity: 0.025;
+  pointer-events: none;
+}
+
+.header-icon {
+  width: 38px;
+  height: 38px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(0,217,163,0.3);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.1rem;
+}
+
+.header-text { display: flex; flex-direction: column; gap: 1px; }
+.header-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+.header-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+}
+
+.header-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+  margin-left: 0.5rem;
+}
+
+.header-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid rgba(0,217,163,0.25);
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MAIN LAYOUT
+════════════════════════════════════════════════════════════ */
+.layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIDEBAR
+════════════════════════════════════════════════════════════ */
+.sidebar {
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  padding: 1.5rem 1rem;
+  position: sticky;
+  top: 64px;
+  height: calc(100vh - 64px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sidebar-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1rem 1.1rem;
+}
+
+.sidebar-card-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Model stat pills */
+.stat-pills { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.stat-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+}
+
+.stat-pill-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat-pill-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid rgba(0,217,163,0.2);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* How to use */
+.steps-list { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+.steps-list li {
+  display: flex;
+  gap: 10px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.step-num {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 1px;
+}
+.steps-list li strong { color: var(--accent); }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-subtle);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MAIN CONTENT
+════════════════════════════════════════════════════════════ */
+.main {
+  padding: 2rem 2.5rem 3rem;
+  max-width: 960px;
+  width: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FORM CARD
+════════════════════════════════════════════════════════════ */
+.form-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem 1.75rem 1.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.form-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 1.4rem;
+}
+
+.card-icon {
+  width: 34px;
+  height: 34px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(0,217,163,0.2);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.card-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.1;
+}
+.card-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FORM GRID
+════════════════════════════════════════════════════════════ */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem 1.25rem;
+}
+.form-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.form-grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+.field-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+/* Number input */
+.field input[type="number"] {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  padding: 0.55rem 0.75rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  -moz-appearance: textfield;
+}
+.field input[type="number"]::-webkit-outer-spin-button,
+.field input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+.field input[type="number"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+/* Select / dropdown */
+.field select {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  padding: 0.55rem 0.75rem;
+  width: 100%;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A94A3' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 2rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.field select option { background: var(--bg-panel); }
+
+/* ─── Toggle Switch ─── */
+.toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.2s;
+  min-height: 38px;
+}
+.toggle-wrap:hover { border-color: var(--accent); }
+
+.toggle-switch {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 9px;
+  transition: background 0.25s;
+  cursor: pointer;
+}
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.25s, background 0.25s;
+}
+.toggle-switch input:checked + .toggle-track {
+  background: var(--accent);
+}
+.toggle-switch input:checked + .toggle-track::after {
+  transform: translateX(16px);
+  background: #fff;
+}
+
+.toggle-state-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: color 0.2s;
+}
+.toggle-state-label.on { color: var(--accent); }
+
+/* ─── Segmented Button ─── */
+.seg-group {
+  display: flex;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.seg-btn {
+  flex: 1;
+  padding: 0.5rem 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+  text-align: center;
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--border); }
+.seg-btn.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 600;
+}
+.seg-btn:hover:not(.active) { background: rgba(255,255,255,0.04); color: var(--text); }
+
+/* ═══════════════════════════════════════════════════════════
+   PREDICT BUTTON
+════════════════════════════════════════════════════════════ */
+.predict-btn-wrap { margin-top: 1.75rem; }
+
+.predict-btn {
+  width: 100%;
+  padding: 0.9rem 2rem;
+  background: var(--accent);
+  color: #0B0F14;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: box-shadow 0.3s, transform 0.2s, background 0.2s;
+  box-shadow: 0 0 0 0 var(--accent-glow);
+}
+.predict-btn:hover:not(:disabled) {
+  box-shadow: 0 0 28px 4px var(--accent-glow), 0 4px 16px rgba(0,217,163,0.3);
+  transform: translateY(-1px);
+}
+.predict-btn:active:not(:disabled) { transform: translateY(0); }
+.predict-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Spinner */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(0,0,0,0.3);
+  border-top-color: #0B0F14;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════════════════════════════════
+   RESULTS PANEL
+════════════════════════════════════════════════════════════ */
+.results-panel {
+  margin-top: 2rem;
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+  pointer-events: none;
+}
+.results-panel.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.results-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 1.25rem;
+}
+
+.status-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--risk-low);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: var(--risk-low-dim);
+  border: 1px solid rgba(34,197,94,0.25);
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.pulse-dot {
+  width: 7px; height: 7px;
+  background: var(--risk-low);
+  border-radius: 50%;
+  animation: pulse-anim 1.6s ease-in-out infinite;
+}
+@keyframes pulse-anim {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.7); }
+}
+
+.results-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Results grid */
+.results-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.result-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.4rem;
+  transition: box-shadow 0.3s;
+}
+.result-card.churn-card {
+  border-color: rgba(239,68,68,0.3);
+  box-shadow: 0 0 0 1px rgba(239,68,68,0.1), inset 0 0 40px rgba(239,68,68,0.04);
+}
+.result-card.stay-card {
+  border-color: rgba(34,197,94,0.3);
+  box-shadow: 0 0 0 1px rgba(34,197,94,0.1), inset 0 0 40px rgba(34,197,94,0.04);
+}
+
+.result-card-eyebrow {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.result-headline {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 0.4rem;
+}
+.result-headline.churn { color: #FCA5A5; }
+.result-headline.stay  { color: #86EFAC; }
+
+.result-sub { font-size: 0.78rem; color: var(--text-muted); }
+
+/* Probability */
+.prob-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+  margin: 0.5rem 0 0.25rem;
+  background: linear-gradient(135deg, #a78bfa, #38bdf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Risk badge */
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0.5rem 1rem;
+  border-radius: 50px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0.25rem;
+  letter-spacing: 0.02em;
+}
+.badge-low  { background: var(--risk-low-dim);  border: 1px solid rgba(34,197,94,0.3);  color: var(--risk-low);  }
+.badge-med  { background: var(--risk-med-dim);  border: 1px solid rgba(245,158,11,0.3); color: var(--risk-med);  }
+.badge-high { background: var(--risk-high-dim); border: 1px solid rgba(239,68,68,0.3);  color: var(--risk-high); }
+
+/* ═══════════════════════════════════════════════════════════
+   RISK METER
+════════════════════════════════════════════════════════════ */
+.meter-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem 1.4rem;
+  margin-bottom: 1rem;
+}
+.meter-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.85rem;
+}
+.meter-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.meter-pct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Track */
+.meter-track-wrap { position: relative; height: 10px; margin-bottom: 0.5rem; }
+.meter-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 5px;
+  background: linear-gradient(90deg,
+    var(--risk-low)  0%,
+    var(--risk-low)  38%,
+    var(--risk-med)  38%,
+    var(--risk-med)  55%,
+    var(--risk-high) 55%,
+    var(--risk-high) 100%
+  );
+  opacity: 0.25;
+}
+.meter-fill {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  border-radius: 5px;
+  background: linear-gradient(90deg,
+    var(--risk-low)  0%,
+    var(--risk-med)  50%,
+    var(--risk-high) 100%
+  );
+  width: 0%;
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Needle */
+.meter-needle {
+  position: absolute;
+  top: -5px;
+  width: 3px;
+  height: 20px;
+  background: #fff;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  left: 0%;
+  transition: left 1s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 8px rgba(255,255,255,0.6);
+}
+.needle-cap {
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 9px;
+  height: 9px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(255,255,255,0.8);
+}
+
+/* Threshold labels */
+.meter-thresholds {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+}
+.thresh {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.63rem;
+  font-weight: 500;
+}
+.thresh-low  { color: var(--risk-low); }
+.thresh-med  { color: var(--risk-med); }
+.thresh-high { color: var(--risk-high); text-align: right; }
+
+/* ═══════════════════════════════════════════════════════════
+   KEY RISK INDICATORS
+════════════════════════════════════════════════════════════ */
+.indicators-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+}
+.indicators-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+.indicators-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+.indicator-chip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+.indicator-chip.good {
+  background: var(--risk-low-dim);
+  border-color: rgba(34,197,94,0.2);
+}
+.indicator-chip.warn {
+  background: var(--risk-med-dim);
+  border-color: rgba(245,158,11,0.2);
+}
+.chip-icon { font-size: 0.9rem; flex-shrink: 0; margin-top: 1px; }
+.chip-text { display: flex; flex-direction: column; gap: 2px; }
+.chip-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text);
+}
+.chip-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   UTILITY
+════════════════════════════════════════════════════════════ */
+.divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 0.5rem 0 1rem;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE
+════════════════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; }
+  .results-grid { grid-template-columns: 1fr; }
+  .indicators-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .main { padding: 1.25rem 1rem 2rem; }
+  .form-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════════════════ -->
+<header class="header">
+  <div class="header-icon">🛡️</div>
+  <div class="header-text">
+    <span class="header-title">ChurnGuard AI</span>
+    <span class="header-sub">POWERED BY XGBOOST</span>
+  </div>
+  <div class="header-divider"></div>
+  <span class="header-badge">SENTINEL DARK v2.0</span>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LAYOUT
+════════════════════════════════════════════════════════════ -->
+<div class="layout">
+
+  <!-- ─────────────────── SIDEBAR ─────────────────── -->
+  <aside class="sidebar">
+
+    <!-- Model Info -->
+    <div class="sidebar-card">
+      <div class="sidebar-card-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Model Info
+      </div>
+      <div class="stat-pills">
+        <div class="stat-pill">
+          <span class="stat-pill-label">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Algorithm
+          </span>
+          <span class="stat-pill-value">XGBoost</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-pill-label">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            Input Features
+          </span>
+          <span class="stat-pill-value">19</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-pill-label">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+            Hyperparams
+          </span>
+          <span class="stat-pill-value">Tuned</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- How to Use -->
+    <div class="sidebar-card">
+      <div class="sidebar-card-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        How to Use
+      </div>
+      <ol class="steps-list">
+        <li>
+          <span class="step-num">1</span>
+          <span>Fill in the <strong>Customer Profile</strong> section with demographic details.</span>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <span>Select the customer's <strong>connectivity</strong> and payment options.</span>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <span>Toggle any active <strong>add-on services</strong>.</span>
+        </li>
+        <li>
+          <span class="step-num">4</span>
+          <span>Click <strong>Predict Churn</strong> to see the risk score.</span>
+        </li>
+      </ol>
+    </div>
+
+    <div class="sidebar-footer">© 2024 ChurnGuard AI · v2.0<br>Model: tuned_xgboost_pipeline.pkl</div>
+  </aside>
+
+  <!-- ─────────────────── MAIN ─────────────────── -->
+  <main class="main">
+
+    <!-- ══════════════════════════════════════════
+         CARD 1: CUSTOMER PROFILE
+    ═══════════════════════════════════════════ -->
+    <div class="form-card">
+      <div class="form-card-header">
+        <div class="card-icon">👤</div>
+        <div>
+          <div class="card-title">Customer Profile</div>
+          <div class="card-desc">Demographics and account details</div>
+        </div>
+      </div>
+
+      <div class="form-grid form-grid-3" style="margin-bottom:1rem;">
+
+        <!-- Gender toggle -->
+        <div class="field">
+          <label class="field-label">Gender</label>
+          <div class="seg-group" id="seg-gender">
+            <button class="seg-btn active" data-val="Male" onclick="setSeg('seg-gender','Male',this)">Male</button>
+            <button class="seg-btn" data-val="Female" onclick="setSeg('seg-gender','Female',this)">Female</button>
+          </div>
+        </div>
+
+        <!-- Senior Citizen -->
+        <div class="field">
+          <label class="field-label">Senior Citizen</label>
+          <label class="toggle-wrap" for="chk-senior">
+            <div class="toggle-switch">
+              <input type="checkbox" id="chk-senior" onchange="updateToggleLabel(this)" />
+              <span class="toggle-track"></span>
+            </div>
+            <span class="toggle-state-label" id="lbl-senior">No</span>
+          </label>
+        </div>
+
+        <!-- Partner -->
+        <div class="field">
+          <label class="field-label">Partner</label>
+          <label class="toggle-wrap" for="chk-partner">
+            <div class="toggle-switch">
+              <input type="checkbox" id="chk-partner" onchange="updateToggleLabel(this)" />
+              <span class="toggle-track"></span>
+            </div>
+            <span class="toggle-state-label" id="lbl-partner">No</span>
+          </label>
+        </div>
+
+        <!-- Dependents -->
+        <div class="field">
+          <label class="field-label">Dependents</label>
+          <label class="toggle-wrap" for="chk-dependents">
+            <div class="toggle-switch">
+              <input type="checkbox" id="chk-dependents" onchange="updateToggleLabel(this)" />
+              <span class="toggle-track"></span>
+            </div>
+            <span class="toggle-state-label" id="lbl-dependents">No</span>
+          </label>
+        </div>
+
+        <!-- Tenure -->
+        <div class="field">
+          <label class="field-label">Tenure (months)</label>
+          <input type="number" id="inp-tenure" min="1" max="72" value="12" />
+        </div>
+
+        <!-- Contract -->
+        <div class="field">
+          <label class="field-label">Contract Type</label>
+          <div class="seg-group" id="seg-contract">
+            <button class="seg-btn active" data-val="Month-to-month" onclick="setSeg('seg-contract','Month-to-month',this)">M2M</button>
+            <button class="seg-btn" data-val="One year" onclick="setSeg('seg-contract','One year',this)">1 Yr</button>
+            <button class="seg-btn" data-val="Two year" onclick="setSeg('seg-contract','Two year',this)">2 Yr</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="form-grid form-grid-2">
+        <!-- Monthly Charges -->
+        <div class="field">
+          <label class="field-label">Monthly Charges ($)</label>
+          <input type="number" id="inp-monthly" min="18.25" max="118.75" step="0.01" value="70.00" />
+        </div>
+
+        <!-- Total Charges -->
+        <div class="field">
+          <label class="field-label">Total Charges ($)</label>
+          <input type="number" id="inp-total" min="18.80" max="8684.80" step="0.01" value="1000.00" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         CARD 2: CONNECTIVITY & PHONE
+    ═══════════════════════════════════════════ -->
+    <div class="form-card" style="border-left-color: #818CF8;">
+      <div class="form-card-header">
+        <div class="card-icon" style="background:rgba(129,140,248,0.12); border-color:rgba(129,140,248,0.25);">📡</div>
+        <div>
+          <div class="card-title">Connectivity &amp; Phone</div>
+          <div class="card-desc">Phone, internet and billing preferences</div>
+        </div>
+      </div>
+
+      <div class="form-grid form-grid-3">
+
+        <!-- Phone Service -->
+        <div class="field">
+          <label class="field-label">Phone Service</label>
+          <label class="toggle-wrap" for="chk-phone">
+            <div class="toggle-switch">
+              <input type="checkbox" id="chk-phone" checked onchange="updateToggleLabel(this); syncPhoneService();" />
+              <span class="toggle-track"></span>
+            </div>
+            <span class="toggle-state-label on" id="lbl-phone">Yes</span>
+          </label>
+        </div>
+
+        <!-- Multiple Lines -->
+        <div class="field">
+          <label class="field-label">Multiple Lines</label>
+          <select id="sel-multilines">
+            <option value="No">No</option>
+            <option value="Yes">Yes</option>
+            <option value="No phone service">No Phone Service</option>
+          </select>
+        </div>
+
+        <!-- Internet Service -->
+        <div class="field">
+          <label class="field-label">Internet Service</label>
+          <select id="sel-internet">
+            <option value="DSL">DSL</option>
+            <option value="Fiber optic">Fiber optic</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+
+        <!-- Payment Method -->
+        <div class="field" style="grid-column: span 2;">
+          <label class="field-label">Payment Method</label>
+          <select id="sel-payment">
+            <option value="Electronic check">Electronic check</option>
+            <option value="Mailed check">Mailed check</option>
+            <option value="Bank transfer (automatic)">Bank transfer (automatic)</option>
+            <option value="Credit card (automatic)">Credit card (automatic)</option>
+          </select>
+        </div>
+
+        <!-- Paperless Billing -->
+        <div class="field">
+          <label class="field-label">Paperless Billing</label>
+          <label class="toggle-wrap" for="chk-paperless">
+            <div class="toggle-switch">
+              <input type="checkbox" id="chk-paperless" onchange="updateToggleLabel(this)" />
+              <span class="toggle-track"></span>
+            </div>
+            <span class="toggle-state-label" id="lbl-paperless">No</span>
+          </label>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         CARD 3: ADD-ON SERVICES
+    ═══════════════════════════════════════════ -->
+    <div class="form-card" style="border-left-color: #A78BFA;">
+      <div class="form-card-header">
+        <div class="card-icon" style="background:rgba(167,139,250,0.12); border-color:rgba(167,139,250,0.25);">🛠️</div>
+        <div>
+          <div class="card-title">Add-on Services</div>
+          <div class="card-desc">Security, support &amp; streaming subscriptions</div>
+        </div>
+      </div>
+
+      <div class="form-grid form-grid-3">
+
+        <div class="field">
+          <label class="field-label">Online Security</label>
+          <label class="toggle-wrap" for="chk-security">
+            <div class="toggle-switch">
+              <input type="checkbox" id="chk-security" onchange="updateToggleLabel(this)" />
+              <span class="toggle-track"></span>
+            </div>
+            <span class="toggle-state-label" id="lbl-security">No</span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Online Backup</label>
+          <label class="toggle-wrap" for="chk-backup">
+            <div class="toggle-switch">
+              <input type="checkbox" id="chk-backup" onchange="updateToggleLabel(this)" />
+              <span class="toggle-track"></span>
+            </div>
+            <span class="toggle-state-label" id="lbl-backup">No</span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Device Protection</label>
+          <label class="toggle-wrap" for="chk-device">
+            <div class="toggle-switch">
+              <input type="checkbox" id="chk-device" onchange="updateToggleLabel(this)" />
+              <span class="toggle-track"></span>
+            </div>
+            <span class="toggle-state-label" id="lbl-device">No</span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Tech Support</label>
+          <label class="toggle-wrap" for="chk-techsupport">
+            <div class="toggle-switch">
+              <input type="checkbox" id="chk-techsupport" onchange="updateToggleLabel(this)" />
+              <span class="toggle-track"></span>
+            </div>
+            <span class="toggle-state-label" id="lbl-techsupport">No</span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Streaming TV</label>
+          <label class="toggle-wrap" for="chk-tv">
+            <div class="toggle-switch">
+              <input type="checkbox" id="chk-tv" onchange="updateToggleLabel(this)" />
+              <span class="toggle-track"></span>
+            </div>
+            <span class="toggle-state-label" id="lbl-tv">No</span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Streaming Movies</label>
+          <label class="toggle-wrap" for="chk-movies">
+            <div class="toggle-switch">
+              <input type="checkbox" id="chk-movies" onchange="updateToggleLabel(this)" />
+              <span class="toggle-track"></span>
+            </div>
+            <span class="toggle-state-label" id="lbl-movies">No</span>
+          </label>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         PREDICT BUTTON
+    ═══════════════════════════════════════════ -->
+    <div class="predict-btn-wrap">
+      <button class="predict-btn" id="predict-btn" onclick="runPrediction()">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+        Predict Churn Probability
+      </button>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         RESULTS PANEL
+    ═══════════════════════════════════════════ -->
+    <div class="results-panel" id="results-panel">
+
+      <!-- Header -->
+      <div class="results-header">
+        <div class="status-label">
+          <span class="pulse-dot"></span>
+          Analysis Complete
+        </div>
+        <span class="results-title">Prediction Result</span>
+      </div>
+
+      <!-- 3-column result cards -->
+      <div class="results-grid">
+
+        <!-- Prediction -->
+        <div class="result-card" id="pred-card">
+          <div class="result-card-eyebrow">Prediction</div>
+          <div class="result-headline" id="pred-headline">— — —</div>
+          <div class="result-sub" id="pred-sub">Run the model to see the result.</div>
+        </div>
+
+        <!-- Probability -->
+        <div class="result-card">
+          <div class="result-card-eyebrow">Churn Probability</div>
+          <div class="prob-number" id="prob-number">—</div>
+          <div class="result-sub">Model confidence score</div>
+        </div>
+
+        <!-- Risk Level -->
+        <div class="result-card" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+          <div class="result-card-eyebrow" style="width:100%;">Risk Level</div>
+          <div id="risk-badge-wrap" style="margin:0.5rem 0 0.5rem;">
+            <span class="risk-badge badge-low" id="risk-badge">— —</span>
+          </div>
+          <div class="result-sub">Based on churn probability threshold</div>
+        </div>
+
+      </div>
+
+      <!-- Risk Meter -->
+      <div class="meter-card">
+        <div class="meter-label-row">
+          <span class="meter-title">Churn Risk Meter</span>
+          <span class="meter-pct" id="meter-pct">—</span>
+        </div>
+        <div class="meter-track-wrap">
+          <div class="meter-track"></div>
+          <div class="meter-fill" id="meter-fill"></div>
+          <div class="meter-needle" id="meter-needle">
+            <span class="needle-cap"></span>
+          </div>
+        </div>
+        <div class="meter-thresholds">
+          <span class="thresh thresh-low">0% — Low</span>
+          <span class="thresh thresh-med">40% — Medium</span>
+          <span class="thresh thresh-high">70% — High</span>
+        </div>
+      </div>
+
+      <!-- Key Risk Indicators -->
+      <div class="indicators-card">
+        <div class="indicators-title">📊 Key Risk Indicators</div>
+        <div class="indicators-grid" id="indicators-grid">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+
+    </div><!-- /results-panel -->
+  </main>
+</div><!-- /layout -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════════════ -->
+<script>
+/* ── API endpoint ──────────────────────────────────────────── */
+const API = 'http://localhost:8000/predict';
+
+/* ── Segmented button helper ───────────────────────────────── */
+function setSeg(groupId, val, btn) {
+  document.querySelectorAll(`#${groupId} .seg-btn`).forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function getSegVal(groupId) {
+  const active = document.querySelector(`#${groupId} .seg-btn.active`);
+  return active ? active.dataset.val : '';
+}
+
+/* ── Toggle label helper ───────────────────────────────────── */
+function updateToggleLabel(chk) {
+  const id   = chk.id.replace('chk-', 'lbl-');
+  const lbl  = document.getElementById(id);
+  if (!lbl) return;
+  lbl.textContent = chk.checked ? 'Yes' : 'No';
+  lbl.classList.toggle('on', chk.checked);
+}
+
+/* ── Sync phone → multiple lines option ─────────────────────── */
+function syncPhoneService() {
+  const hasPhone = document.getElementById('chk-phone').checked;
+  const sel = document.getElementById('sel-multilines');
+  if (!hasPhone) sel.value = 'No phone service';
+}
+
+/* ── Internet service toggle helper ─────────────────────────── */
+function getInternetServiceValue(field) {
+  const internet = document.getElementById('sel-internet').value;
+  const chk = document.getElementById(`chk-${field}`);
+  if (internet === 'No') return 'No internet service';
+  return chk.checked ? 'Yes' : 'No';
+}
+
+/* ── Collect form data ─────────────────────────────────────── */
+function collectFormData() {
+  const yesNo = id => document.getElementById(id).checked ? 'Yes' : 'No';
+
+  return {
+    gender:           getSegVal('seg-gender'),
+    SeniorCitizen:    document.getElementById('chk-senior').checked ? 1 : 0,
+    Partner:          yesNo('chk-partner'),
+    Dependents:       yesNo('chk-dependents'),
+    tenure:           parseInt(document.getElementById('inp-tenure').value) || 12,
+    PhoneService:     yesNo('chk-phone'),
+    MultipleLines:    document.getElementById('sel-multilines').value,
+    InternetService:  document.getElementById('sel-internet').value,
+    OnlineSecurity:   getInternetServiceValue('security'),
+    OnlineBackup:     getInternetServiceValue('backup'),
+    DeviceProtection: getInternetServiceValue('device'),
+    TechSupport:      getInternetServiceValue('techsupport'),
+    StreamingTV:      getInternetServiceValue('tv'),
+    StreamingMovies:  getInternetServiceValue('movies'),
+    Contract:         getSegVal('seg-contract'),
+    PaperlessBilling: yesNo('chk-paperless'),
+    PaymentMethod:    document.getElementById('sel-payment').value,
+    MonthlyCharges:   parseFloat(document.getElementById('inp-monthly').value) || 70,
+    TotalCharges:     parseFloat(document.getElementById('inp-total').value) || 1000,
+  };
+}
+
+/* ── Render results ─────────────────────────────────────────── */
+function renderResults(data) {
+  const { prediction, probability, risk } = data;
+  const pct = (probability * 100).toFixed(1);
+
+  /* ── Prediction card ── */
+  const predCard     = document.getElementById('pred-card');
+  const predHeadline = document.getElementById('pred-headline');
+  const predSub      = document.getElementById('pred-sub');
+  predCard.className = 'result-card ' + (prediction === 1 ? 'churn-card' : 'stay-card');
+  predHeadline.className = 'result-headline ' + (prediction === 1 ? 'churn' : 'stay');
+  predHeadline.textContent = prediction === 1 ? '⚠️ Will Churn' : '✅ Will Stay';
+  predSub.textContent = prediction === 1
+    ? 'Customer shows a high likelihood of leaving.'
+    : 'Customer is likely to remain subscribed.';
+
+  /* ── Probability ── */
+  document.getElementById('prob-number').textContent = pct + '%';
+
+  /* ── Risk badge ── */
+  const badge = document.getElementById('risk-badge');
+  const riskMap = {
+    low:    { cls: 'badge-low',  label: '🟢 Low Churn Risk' },
+    medium: { cls: 'badge-med',  label: '🟡 Medium Churn Risk' },
+    high:   { cls: 'badge-high', label: '🔴 High Churn Risk' },
+  };
+  const r = riskMap[risk];
+  badge.className = 'risk-badge ' + r.cls;
+  badge.textContent = r.label;
+
+  /* ── Meter ── */
+  document.getElementById('meter-pct').textContent = pct + '% Probability';
+  // Delay so transition is visible after panel fade-in
+  setTimeout(() => {
+    document.getElementById('meter-fill').style.width   = pct + '%';
+    document.getElementById('meter-needle').style.left  = pct + '%';
+  }, 80);
+
+  /* ── Key Risk Indicators ── */
+  const formData = collectFormData();
+  const indicators = buildIndicators(formData, probability);
+  const grid = document.getElementById('indicators-grid');
+  grid.innerHTML = indicators.map(ind => `
+    <div class="indicator-chip ${ind.good ? 'good' : 'warn'}">
+      <span class="chip-icon">${ind.icon}</span>
+      <div class="chip-text">
+        <span class="chip-label">${ind.label}</span>
+        <span class="chip-sub">${ind.sub}</span>
+      </div>
+    </div>
+  `).join('');
+
+  /* ── Show panel ── */
+  const panel = document.getElementById('results-panel');
+  panel.classList.add('visible');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ── Build indicators array ─────────────────────────────────── */
+function buildIndicators(d, prob) {
+  return [
+    {
+      good:  d.tenure >= 12,
+      icon:  d.tenure >= 12 ? '✅' : '⚠️',
+      label: d.tenure >= 12 ? 'Established customer' : 'Short tenure — higher risk',
+      sub:   `Tenure: ${d.tenure} months`,
+    },
+    {
+      good:  d.Contract !== 'Month-to-month',
+      icon:  d.Contract !== 'Month-to-month' ? '✅' : '⚠️',
+      label: d.Contract !== 'Month-to-month' ? 'Long-term contract' : 'Month-to-month contract',
+      sub:   `Contract: ${d.Contract}`,
+    },
+    {
+      good:  d.MonthlyCharges <= 80,
+      icon:  d.MonthlyCharges <= 80 ? '✅' : '⚠️',
+      label: d.MonthlyCharges <= 80 ? 'Moderate monthly charges' : 'High monthly charges',
+      sub:   `Monthly: $${d.MonthlyCharges.toFixed(2)}`,
+    },
+    {
+      good:  d.InternetService !== 'Fiber optic',
+      icon:  d.InternetService !== 'Fiber optic' ? '✅' : '⚠️',
+      label: d.InternetService !== 'Fiber optic' ? 'Standard internet plan' : 'Fiber optic — often higher churn',
+      sub:   `Internet: ${d.InternetService}`,
+    },
+  ];
+}
+
+/* ── Main prediction handler ─────────────────────────────────── */
+async function runPrediction() {
+  const btn = document.getElementById('predict-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Analyzing…';
+
+  const payload = collectFormData();
+
+  try {
+    const res = await fetch(API, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    const data = await res.json();
+    renderResults(data);
+
+  } catch (err) {
+    alert(`❌ Could not reach the prediction API.\n\nMake sure the backend is running:\n  python api.py\n\nError: ${err.message}`);
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+      </svg>
+      Predict Churn Probability`;
+  }
+}
+
+/* ── Init all toggle labels on page load ─────────────────────── */
+document.querySelectorAll('.toggle-switch input[type="checkbox"]').forEach(chk => {
+  updateToggleLabel(chk);
+});
+</script>
+
+</body>
+</html>
